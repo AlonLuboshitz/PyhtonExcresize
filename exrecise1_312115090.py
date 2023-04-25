@@ -60,7 +60,7 @@ def translate(rna_seq,position):
         else:
             temp_length += 1
             temp_seq += ';' + codon_letter
-    if aa_seq == 0:
+    if aa_length == 0:
         return 'Non-coding RNA'
     else:
         return aa_seq
@@ -116,4 +116,4 @@ def createAminoAcidsDict():
 def convert(aa,letter):
     dict = {key: letter for key in aa}
     return dict
-translate('AUGUAACGUG',2)
+print(translate('AUGUAACGUG',2))
