@@ -43,7 +43,7 @@ def translate(rna_seq,position):
         codon_letter = aa_dict[codon]
         if new_seq:
             if codon_letter == 'M':
-                temp_seq += 'M'
+                temp_seq += 'M' + ';'
                 new_seq = False
                 temp_length = 1
             else:
@@ -59,11 +59,11 @@ def translate(rna_seq,position):
             new_seq = True
         else:
             temp_length += 1
-            temp_seq += ';' + codon_letter
+            temp_seq += codon_letter + ';'
     if aa_length == 0:
         return 'Non-coding RNA'
     else:
-        return aa_seq
+        return aa_seq[:-1]
 
 
 
@@ -116,4 +116,4 @@ def createAminoAcidsDict():
 def convert(aa,letter):
     dict = {key: letter for key in aa}
     return dict
-print(translate('AUGUAACGUG',2))
+print(translate('AUGAUGUAACGUG',0))
