@@ -14,6 +14,70 @@ def transcribe(dna_seq):
     print(casefold_seq[::-1])
 
 '''
+this function is for ssr function, updating given count to a ssr'''
+def update_count_dict(count,ssr_dict,ssr):
+    dict_count = ssr_dict.get(ssr)
+    if dict_count is None or count > dict_count:
+        ssr_dict[ssr] = count 
+    return ssr_dict
+        
+'''
+given a dna seq check what is most repetative seq with max size of 6.
+we'll do a naive solution going through every index from 0 - end.
+for each index create 1-6 size substring and check if repeats x times.
+if it does (3 or more) add to dict :
+check if exists in dict alrdy - if bigger exchange (lambda).'''
+def ssr(dna_seq):
+    ssr_dict = {}
+    # size of substr 1 - 6
+    for j in range(1,6):
+        # iterating over dna_seq through offset
+        for i in range(0, len(dna_seq), 1):
+            #validating index
+            if not len(dna_seq[i:i+j])%j == 0:
+                break
+            #iterating over dna_seq via substr size
+            ssr = dna_seq[i:i+j]
+            count = 1
+            lenn = len(dna_seq)
+            for k in range(i+j,len(dna_seq),j):
+                #validating next index
+                if not len(dna_seq[k:k+j])%j == 0:
+                    break
+                next_ssr = dna_seq[k:k+j]
+                if ssr == next_ssr:
+                    count += 1
+                    if k == (lenn - j) and count > 2:
+                        ssr_dict = update_count_dict(count,ssr_dict,ssr)
+                else:
+                    #update dictionary
+                    if count > 2:
+                        ssr_dict = update_count_dict(count,ssr_dict,ssr)
+                    ssr = next_ssr  
+                    count = 1    
+    
+    #do stuff
+    return convert_dic_repsentation(ssr_dict)
+'''
+this function converts dict into a string
+represnting the keys sorted separted by ',' then their value then ';'
+'''
+def convert_dic_repsentation(dict):
+    if not dict:
+        return 'No simple repeats in DNA sequence'
+    else:
+        text =''
+        myKeys = list(dict.keys())
+        myKeys.sort()
+        for i in myKeys:
+            text = text + i + ',' + str(dict[i]) + ';'
+        return text[:-1]
+
+print(ssr('ATCAAATCAAATCAAGAGAGAGGGGG'))
+
+
+
+'''
 this function will take 2 args.
 first translate rna_seq to AA letters and assign "Z" as a stop codon
 then determine which seq is the longest by iterating over the letters.
