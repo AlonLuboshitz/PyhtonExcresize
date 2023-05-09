@@ -1,8 +1,9 @@
 # Alon Luboshitz 312115090
+import sys
 ''' Transcribe function - Dna seq into Rna.
 1. Get dna seq
-2. save length -> save length parameters 5', 3'.
-3. read Dna from the end and append current letter to Rna seq.
+2. replace corsponding letters using build in dictorionary.
+3. Read the seq backwards 5-3 --> 3-5.
 4. return Rna seq '''
 # check for empty string?
 def transcribe(dna_seq):
@@ -11,7 +12,7 @@ def transcribe(dna_seq):
     replace_dic = {'c' : 'G', 't' : 'A', 'a' : 'U', 'g': 'C' }
     for char in replace_dic.keys():
         casefold_seq = casefold_seq.replace(char, replace_dic[char])
-    print(casefold_seq[::-1])
+    return(casefold_seq[::-1])
 
 '''
 this function is for ssr function, updating given count to a ssr'''
@@ -26,9 +27,10 @@ given a dna seq check what is most repetative seq with max size of 6.
 we'll do a naive solution going through every index from 0 - end.
 for each index create 1-6 size substring and check if repeats x times.
 if it does (3 or more) add to dict :
-check if exists in dict alrdy - if bigger exchange (lambda).'''
-def ssr(dna_seq):
+check if exists in dict alrdy - if bigger exchange.'''
+def find_ssr(dna_seq):
     ssr_dict = {}
+    dna_seq = dna_seq.upper()
     # size of substr 1 - 6
     for j in range(1,6):
         # iterating over dna_seq through offset
@@ -55,9 +57,8 @@ def ssr(dna_seq):
                         ssr_dict = update_count_dict(count,ssr_dict,ssr)
                     ssr = next_ssr  
                     count = 1    
-    
-    #do stuff
-    return convert_dic_repsentation(ssr_dict)
+  
+    return ssr_dict
 '''
 this function converts dict into a string
 represnting the keys sorted separted by ',' then their value then ';'
@@ -73,7 +74,6 @@ def convert_dic_repsentation(dict):
             text = text + i + ',' + str(dict[i]) + ';'
         return text[:-1]
 
-print(ssr('ATCAAATCAAATCAAGAGAGAGGGGG'))
 
 
 
@@ -124,13 +124,8 @@ def translate(rna_seq,position):
         else:
             temp_length += 1
             temp_seq += codon_letter + ';'
-    if aa_length == 0:
-        return 'Non-coding RNA'
-    else:
-        return aa_seq[:-1]
-
-
-
+    return aa_seq[:-1]
+    
     
 def createAminoAcidsDict():
     # set lists for aa by letter.
@@ -180,4 +175,16 @@ def createAminoAcidsDict():
 def convert(aa,letter):
     dict = {key: letter for key in aa}
     return dict
-print(translate('AUGAUGUAACGUG',0))
+if __name__ == '__main__':
+    if not len(sys.argv) == 5:
+        print('ERROR! wrong number of arguments')
+        exit(0)
+    else:
+        ssr_dict = find_ssr(sys.argv[1])
+        print(convert_dic_repsentation(ssr_dict))
+        print('RNA sequence: ' + transcribe(sys.argv[2]))
+        mrna= translate(sys.argv[3],int(sys.argv[4]))
+        if len(mrna) == 0:
+            print('Non-coding RNA')
+        else:
+            print('Translation: ' + mrna) 
