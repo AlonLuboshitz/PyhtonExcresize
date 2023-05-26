@@ -1,23 +1,207 @@
 # Alon Luboshitz 312115090
 import sys
-from exrecise1_312115090 import *
+import csv
 class Cell:
     def __init__(self,name,genome) -> None:
         self.__name = name
         self.__genome =  genome
-        self.__numseq = len(genome)
+        if len(genome) > 0 :  
+            self.__numseq = len(genome)
+        else: self.__numseq = None
     def __str__(self) -> str:
         return '<' + self.__name + ', ' + str(self.__numseq) + '>'
+    '''
+    given a dna seq check what is most repetative seq with max size of 6.
+    we'll do a naive solution going through every index from 0 - end.
+    for each index create 1-6 size substring and check if repeats x times.
+    if it does (3 or more) add to dict :
+    check if exists in dict alrdy - if bigger exchange.'''
+    def __find_ssr__(self,dna_seq):
+        ssr_dict = {}
+        dna_seq = dna_seq.upper()
+        # size of substr 1 - 6
+        for j in range(1,6):
+            # iterating over dna_seq through offset
+            for i in range(0, len(dna_seq), 1):
+                #validating index
+                if not len(dna_seq[i:i+j])%j == 0:
+                    break
+                #iterating over dna_seq via substr size
+                ssr = dna_seq[i:i+j]
+                count = 1
+                lenn = len(dna_seq)
+                for k in range(i+j,len(dna_seq),j):
+                    #validating next index
+                    if not len(dna_seq[k:k+j])%j == 0:
+                        break
+                    next_ssr = dna_seq[k:k+j]
+                    if ssr == next_ssr:
+                        count += 1
+                        if k == (lenn - j) and count > 2:
+                            ssr_dict = self.__update_count_dict__(count,ssr_dict,ssr)
+                    else:
+                        #update dictionary
+                        if count > 2:
+                            ssr_dict = self.__update_count_dict__(count,ssr_dict,ssr)
+                        ssr = next_ssr  
+                        count = 1    
+    
+        return ssr_dict
+    '''
+    this function converts dict into a string
+    represnting the keys sorted separted by ',' then their value then ';'
+    '''
+    def __convert_dic_repsentation__(self,dict):
+        if not dict:
+            return 'No simple repeats in DNA sequence'
+        else:
+            text =''
+            myKeys = list(dict.keys())
+            myKeys.sort()
+            for i in myKeys:
+                text = text + i + ',' + str(dict[i]) + ';'
+            return text[:-1]
+    
+    '''
+    this function is for ssr function, updating given count to a ssr'''
+    def __update_count_dict__(self,count,ssr_dict,ssr):
+        dict_count = ssr_dict.get(ssr)
+        if dict_count is None or count > dict_count:
+            ssr_dict[ssr] = count 
+        return ssr_dict
+    
+    '''
+    this function will take 2 args.
+    first translate rna_seq to AA letters and assign "Z" as a stop codon
+    then determine which seq is the longest by iterating over the letters.
+    return the longest seq if exists.
+    set temp length_seq = 0, protien_seq =empty.
+    iterate in jumps of 3 from the position given.
+    map 3 Nuc into AA letter. -> translate all AA - set special letter for STOP
+    boolean value for new_seq or not.
+    if new seq and M -> create new_seq, append till STOP.
+    set length.
+    if new_length>old_length set new seq to longest.
+    return seq.'''
+    def __translate__(self,rna_seq,position):
+        if position < 0 or position > 2:
+            position = 0
+        aa_dict = self.__createAminoAcidsDict__()
+        upper_rna = rna_seq.upper()
+        aa_seq = ''
+        aa_length = 0
+        new_seq = True
+        temp_length = 0
+        temp_seq = ''
+        for i in range(position, len(upper_rna), 3):
+            codon = upper_rna[i:i+3]
+            if not len(codon)%3 == 0:
+                break 
+            codon_letter = aa_dict[codon]
+            if new_seq:
+                if codon_letter == 'M':
+                    temp_seq += 'M' + ';'
+                    new_seq = False
+                    temp_length = 1
+                else:
+                    pass
+            elif codon_letter == 'Z':
+                #termination of protein
+                if temp_length > aa_length:
+                    aa_seq = temp_seq
+                    aa_length = temp_length
+                #new protien shorter then previuos keep old and reset new
+                temp_seq = ''
+                temp_length = 0
+                new_seq = True
+            else:
+                temp_length += 1
+                temp_seq += codon_letter + ';'
+        return aa_seq[:-1]
+            
+    def __createAminoAcidsDict__(self):
+        # set lists for aa by letter.
+        S = ['UCU','UCC','UCA','UCG','AGU','AGC']
+        F = ['UUU','UUC']
+        L = ['UUA','UUG','CUU','CUC','CUA','CUG']
+        I = ['AUU','AUC','AUA']
+        V = ['GUU','GUC','GUA','GUG']
+        P = ['CCU','CCC','CCA','CCG']
+        T = ['ACU','ACC','ACA','ACG']
+        A = ['GCU','GCC','GCA','GCG']
+        Y = ['UAU','UAC']
+        Z = ['UAA','UAG','UGA']
+        H = ['CAU','CAC']
+        Q = [ 'CAA','CAG']
+        N = ['AAU','AAC']
+        K = ['AAA','AAG']
+        D = [ 'GAU','GAC']
+        E = ['GAA','GAG']
+        C = ['UGU','UGC']
+        R = ['CGU','CGC','CGA','CGG','AGA','AGG']
+        G = ['GGU','GGC','GGA','GGG']
+        # set empty dic
+        aa_dic = {}
+        aa_dic.update(self.__convert__(S,'S'))
+        aa_dic.update(self.__convert__(F,'F'))
+        aa_dic.update(self.__convert__(L,'L'))
+        aa_dic.update(self.__convert__(I,'I'))
+        aa_dic.update(self.__convert__(V,'V'))
+        aa_dic.update(self.__convert__(P,'P'))
+        aa_dic.update(self.__convert__(T,'T'))
+        aa_dic.update(self.__convert__(A,'A'))
+        aa_dic.update(self.__convert__(Y,'Y'))
+        aa_dic.update(self.__convert__(Z,'Z'))
+        aa_dic.update(self.__convert__(H,'H'))
+        aa_dic.update(self.__convert__(Q,'Q'))
+        aa_dic.update(self.__convert__(N,'N'))
+        aa_dic.update(self.__convert__(K,'K'))
+        aa_dic.update(self.__convert__(D,'D'))
+        aa_dic.update(self.__convert__(E,'E'))
+        aa_dic.update(self.__convert__(C,'C'))
+        aa_dic.update(self.__convert__(R,'R'))
+        aa_dic.update(self.__convert__(G,'G'))
+        aa_dic.update(UGG = 'W')
+        aa_dic.update(AUG = 'M')
+        return aa_dic
+    def __convert__(self,aa,letter):
+        dict = {key: letter for key in aa}
+        return dict
+    ''' Transcribe function - Dna seq into Rna.
+    1. Get dna seq
+    2. replace corsponding letters using build in dictorionary.
+    3. Read the seq backwards 5-3 --> 3-5.
+    4. return Rna seq '''
+    # check for empty string?
+    def __transcribe__(self,dna_seq):
+        casefold_seq = dna_seq.casefold()
+        # iniating replacment dictoinary
+        replace_dic = {'c' : 'G', 't' : 'A', 'a' : 'U', 'g': 'C' }
+        for char in replace_dic.keys():
+            casefold_seq = casefold_seq.replace(char, replace_dic[char])
+        return(casefold_seq[::-1])
     def _find_srr_(self,dna_position):
         #unpack tuple in position
         dna_seq = self.__genome[(dna_position%self.__numseq)[0]]
-        return find_ssr(dna_seq)
+        return self.__convert_dic_repsentation__(dna_seq)
     def _translate_(self,dna_position):
-        pass
+        dna_tuple = self.__genome[(dna_position%self.__numseq)]
+        return self.__translate__(dna_tuple[0],dna_tuple[1] - 1)
     def _transcribe_(self,dna_position):
-        pass
+        dna_seq = self.__genome[(dna_position%self.__numseq)[0]]
+        return self.__transcribe__(dna_seq)
+    '''this function return a list with all the genome ssr and translation for this dna.
+    if the genome is empty return empty list'''
     def _repertoire_(self):
-        pass
+        rep_list = []
+        if self.__numseq is None:
+            return rep_list
+        else:
+            for i in self.__numseq:
+                ssr_translate_tuple = (self._find_srr_(i),self._translate_(i))
+                rep_list.append(ssr_translate_tuple)
+        return rep_list
+
     def get_genome(self):
         return self.__genome
     def get_name(self):
@@ -31,7 +215,11 @@ class StemCell(Cell):
     def mitosis(self):
         return self * 2
     def differentiate(self, cell_name, args):
-        return Cell
+        if (cell_name == 'Nerve Cell'):
+            return self.NerveCell(self,args)
+        elif (cell_name == 'Muscle Cell'):
+            return self.MuscleCell(self,args)
+        else: return 'trying to init an unkown cell, please try again.'
     class MuscleCell(Cell):
         # init muscle cell from 
         def __init__(self,Stem_cell, args) -> None:
@@ -63,7 +251,119 @@ class NerveNetwork:
         for i in self.__cell_list:
             str = (i + '\n')
         return str
+# ''' this function gets input_path for an input file and validates its according to instrcutions:
+# 1. check there are only 4 headline.
+# 2. check all cells are from MC\NC type
+# 3. check that all the dna_seq are from A,T,C,G building blocks.
+# 4. check that all reading frame are between 1-3.
+# 5. check that there are matching amount of reading frames to dna_seq number.
+# 6. check the parameter field:
+# '''
+def validate_file(input_path):
+    with open('input.txt', 'r') as tsbfile:
+        csv_reader = csv.DictReader(tsbfile,delimiter='\t')
+        keys = csv_reader.fieldnames
+        valid_keys = check_headlines(keys)
+        assert valid_keys[0],"File illegal"
+        for row in csv_reader:
+            type_check = check_type(row,valid_keys[1][0])
+            assert type_check[0],"File illegal"
+            dna_check = check_DNA(row,valid_keys[1][1])
+            assert dna_check[0],"File illegal"
+            frame_check = check_readingframe(row,valid_keys[1][2])
+            assert frame_check[0],"File illegal"
+            assert int(frame_check[2]) == int(dna_check[2]),"File illegal"
+            param_check = check_parameter(row,valid_keys[1][3],type_check[2])
+            assert param_check[0],"File illegal"
 
+            
+        
+           
+def check_headlines(keys):
+    look_for = ['type','dna','reading_frames','parameter']
+    valid_heads = []
+    for x in look_for:
+        for y in keys:
+            if y.casefold().find(x) != -1:
+                valid_heads.append(y)
+                break
+    if len(valid_heads) == len(look_for):
+        return (True,valid_heads)
+    else : return (False,)
+'''this function gets a line from the file and creates the intended cell
+line is 4 types longs and alrdy has been validated'''
+# def create_cell(line):  
+#     for i
+ 
+# '''all check functions gets a line represented with a dictionary, and the keys view itself.
+# is searches for the headline casefolding if exists checks the context.
+# if not return false.'''
+
+# '''check there is type header.
+# if so check if its MC\NC if true returns tuple with the name
+# if not returns false.'''
+
+def check_type(row, look_for):
+    name = row.get(look_for) 
+    if name == 'NC':
+        return (True,name,1)
+    elif name == 'MC':
+        return (True,name,2)
+    else: return (False,)
+
+def check_DNA(row,look_for):
+    dna_seq = row.get(look_for)
+    #split the dna by "comma"
+    dna_seq = dna_seq.split(",")
+    num_seq = len(dna_seq)
+    nucleotide_set = {'T','G','A','C'}
+    for dna in dna_seq:
+        #make set of dna_seq and check if the sets equals
+        dna_set = set(dna.upper())
+        if not dna_set.issubset(nucleotide_set):
+            #dna_seq has other letters then a,t,g,c
+            return (False,)
+        # all seqs have valid chars
+        return (True,dna_seq,num_seq)
+def check_readingframe(row,look_for):         
+    reading_frame = row.get(look_for)
+    #split the dna by "comma"
+    reading_frame = reading_frame.split(",")
+    num_frames = len(reading_frame)
+    valid_frame = [1,2,3]
+    for x in reading_frame:
+        if int(x) not in valid_frame:
+            return (False,)
+    return (True,reading_frame,num_frames)
+#checks parameter by cell type.
+# 1 = NC, 2 = MC
+def check_parameter(row,look_for,cell_type):
+    param = row.get(look_for)
+    param = param.split(",")
+    num_of_params = len(param)
+    #neuron cell, assuming 1 param - float
+    if cell_type == 1:
+        if num_of_params != 1:
+            return (False,)
+        param = float(param[0])
+        if param == int (param) or param < 0:
+            #not decimal number\ negative
+            return (False,)
+        else: return (True,param)
+    else: #cell type 2 MC
+        if num_of_params != 2:
+            return (False,)  
+        if float(param[1]) < 0:
+            return (False,) 
+        else: return (True,param)
+            
+              
+
+validate_file('ss')
+s = StemCell('s','s')
+b = s.differentiate('Nerve Cell', 0.8)
+b.send(3)
+b.receive(3)
 
     
 
