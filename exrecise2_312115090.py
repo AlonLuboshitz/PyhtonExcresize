@@ -6,7 +6,7 @@ class Cell:
         self.__name = name
         self.__genome =  genome
         if len(genome) > 0 :  
-            self.__numseq = len(genome)
+            self.__numseq = len(genome[0])
         else: self.__numseq = None
     def __str__(self) -> str:
         return '<' + self.__name + ', ' + str(self.__numseq) + '>'
@@ -117,6 +117,8 @@ class Cell:
             else:
                 temp_length += 1
                 temp_seq += codon_letter + ';'
+        if temp_length > aa_length:
+            aa_seq = temp_seq
         return aa_seq[:-1]
             
     def __createAminoAcidsDict__(self):
@@ -182,13 +184,20 @@ class Cell:
         return(casefold_seq[::-1])
     def _find_srr_(self,dna_position):
         #unpack tuple in position
-        dna_seq = self.__genome[(dna_position%self.__numseq)[0]]
-        return self.__convert_dic_repsentation__(dna_seq)
+        dna_seq = self.__genome[0][dna_position%self.__numseq]
+        dict = self.__find_ssr__(dna_seq)
+        return self.__convert_dic_repsentation__(dict)
     def _translate_(self,dna_position):
-        dna_tuple = self.__genome[(dna_position%self.__numseq)]
-        return self.__translate__(dna_tuple[0],dna_tuple[1] - 1)
+        #dna_tuple = self.__genome[(dna_position%self.__numseq)]
+        rna_seq = self._transcribe_(dna_position)
+        reading_frame = self.__genome[1][dna_position%self.__numseq]
+        translation =  self.__translate__(rna_seq,int(reading_frame) - 1)
+        if len(translation) == 0:
+            return 'Non-coding RNA'
+        else:
+            return 'Translation: ' + translation
     def _transcribe_(self,dna_position):
-        dna_seq = self.__genome[(dna_position%self.__numseq)[0]]
+        dna_seq = self.__genome[0][dna_position%self.__numseq]
         return self.__transcribe__(dna_seq)
     '''this function return a list with all the genome ssr and translation for this dna.
     if the genome is empty return empty list'''
@@ -197,7 +206,7 @@ class Cell:
         if self.__numseq is None:
             return rep_list
         else:
-            for i in self.__numseq:
+            for i in range(self.__numseq):
                 ssr_translate_tuple = (self._find_srr_(i),self._translate_(i))
                 rep_list.append(ssr_translate_tuple)
         return rep_list
@@ -211,7 +220,13 @@ class StemCell(Cell):
     def __init__(self, name, genome) -> None:
         super().__init__(name, genome)
     def __mul__(self, P):
-        pass
+        assert P > 0 ,"Cannot multiple Stem Cell by zero or negative number"
+        assert float(P) == int(P),"cannot multiple stemcell by non int number"
+        stem_cells = []
+        stem_cells.append(self)
+        for i in range(P-1):
+            stem_cells.append(StemCell(self.get_name(),self.get_genome()))
+        return stem_cells
     def mitosis(self):
         return self * 2
     def differentiate(self, cell_name, args):
@@ -240,17 +255,26 @@ class StemCell(Cell):
 class NerveNetwork:
     def __init__(self, cell_list) -> None:
         self.__cell_list = cell_list
-        self.__nerve_cells = None
-        self.__muscle_cell = None
+        self.__nerve_cells = []
+        self.__muscle_cell = []
+        self.split_to_cells()
     def send_signal(self,signal):
         for i in self.__nerve_cells:
             signal = i.receive(signal)
             signal = i.send(signal)
         self.__muscle_cell.receive(signal)
     def __str__(self) -> str:
+        str = ''
         for i in self.__cell_list:
-            str = (i + '\n')
+            str = str + (i.__str__() + '\n')
         return str
+    def split_to_cells(self):
+        for cell in self.__cell_list:
+            if cell.get_name() == 'Nerve Cell':
+                self.__nerve_cells.append(cell)
+            else : self.__muscle_cell.append(cell)
+    def get_muscle_cell(self):
+        return self.__muscle_cell[0]
 # ''' this function gets input_path for an input file and validates its according to instrcutions:
 # 1. check there are only 4 headline.
 # 2. check all cells are from MC\NC type
@@ -260,11 +284,12 @@ class NerveNetwork:
 # 6. check the parameter field:
 # '''
 def validate_file(input_path):
-    with open('input.txt', 'r') as tsbfile:
+    with open(input_path, 'r') as tsbfile:
         csv_reader = csv.DictReader(tsbfile,delimiter='\t')
         keys = csv_reader.fieldnames
         valid_keys = check_headlines(keys)
         assert valid_keys[0],"File illegal"
+        cells = []
         for row in csv_reader:
             type_check = check_type(row,valid_keys[1][0])
             assert type_check[0],"File illegal"
@@ -275,8 +300,8 @@ def validate_file(input_path):
             assert int(frame_check[2]) == int(dna_check[2]),"File illegal"
             param_check = check_parameter(row,valid_keys[1][3],type_check[2])
             assert param_check[0],"File illegal"
-
-            
+            create_cell(type_check[1],dna_check[1],frame_check[1],param_check[1],cells)
+        return cells    
         
            
 def check_headlines(keys):
@@ -291,9 +316,17 @@ def check_headlines(keys):
         return (True,valid_heads)
     else : return (False,)
 '''this function gets a line from the file and creates the intended cell
-line is 4 types longs and alrdy has been validated'''
-# def create_cell(line):  
-#     for i
+line is 4 types longs and alrdy has been validated,cell num 1 is nc, 2 is mc'''
+def create_cell(name,dna_seq,frames,param,cells): 
+    genome = (dna_seq,frames) 
+    cell = StemCell('name',genome)
+    if name == 'NC':
+        #nc
+        for each_cell in cell.mitosis():
+            cells.append(each_cell.differentiate('Nerve Cell',param))
+    else : #must be MC
+        cells.append(cell.differentiate('Muscle Cell',param))
+    
  
 # '''all check functions gets a line represented with a dictionary, and the keys view itself.
 # is searches for the headline casefolding if exists checks the context.
@@ -358,13 +391,10 @@ def check_parameter(row,look_for,cell_type):
         else: return (True,param)
             
               
-
-validate_file('ss')
-s = StemCell('s','s')
-b = s.differentiate('Nerve Cell', 0.8)
-b.send(3)
-b.receive(3)
-
-    
-
-        
+if __name__ == '__main__':
+    cells = validate_file('input.txt')
+    network = NerveNetwork(cells)
+    print(network)
+    print(network.get_muscle_cell()._repertoire_())
+    c = Cell('sad',('ATGATGATGCAT',1))
+    c._transcribe_(0)
