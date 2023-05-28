@@ -215,6 +215,8 @@ class Cell:
         return self.__genome
     def get_name(self):
         return self.__name
+    def set_name(self,name):
+        self.__name = name
 
 class StemCell(Cell):
     def __init__(self, name, genome) -> None:
@@ -241,17 +243,22 @@ class StemCell(Cell):
             super().__init__('Muscle Cell', Stem_cell.get_genome())
             self.__treshold = args[1]
             self.__file_path = args[0]
-        def receive(signal):
+        def receive(self,signal):
             #write to file if signal> treshold
-            pass
+            if float(signal) > float(self.__treshold):
+                with open(self.__file_path,"a") as file:
+                    line = str(signal) + ', I like to move it\n'
+                    file.write(line)
+            else: pass
     class NerveCell(Cell):
         def __init__(self, Stem_cell, P) -> None:
             super().__init__('Nerve Cell', Stem_cell.get_genome())
             self.__coefficient = P
+            self.__signal = 0
         def receive(self, signal):
-            return signal * self.__coefficient
-        def send(self, signal):
-            return signal * self.__coefficient
+            self.__signal = signal
+        def send(self):
+            return self.__signal * self.__coefficient
 class NerveNetwork:
     def __init__(self, cell_list) -> None:
         self.__cell_list = cell_list
@@ -260,13 +267,14 @@ class NerveNetwork:
         self.split_to_cells()
     def send_signal(self,signal):
         for i in self.__nerve_cells:
-            signal = i.receive(signal)
-            signal = i.send(signal)
-        self.__muscle_cell.receive(signal)
+            i.receive(signal)
+            signal = i.send()
+        self.__muscle_cell[0].receive(signal)
     def __str__(self) -> str:
         str = ''
         for i in self.__cell_list:
             str = str + (i.__str__() + '\n')
+        str = str + self.convert_cell_repertoire(self.__muscle_cell[0])
         return str
     def split_to_cells(self):
         for cell in self.__cell_list:
@@ -275,14 +283,27 @@ class NerveNetwork:
             else : self.__muscle_cell.append(cell)
     def get_muscle_cell(self):
         return self.__muscle_cell[0]
-# ''' this function gets input_path for an input file and validates its according to instrcutions:
-# 1. check there are only 4 headline.
-# 2. check all cells are from MC\NC type
-# 3. check that all the dna_seq are from A,T,C,G building blocks.
-# 4. check that all reading frame are between 1-3.
-# 5. check that there are matching amount of reading frames to dna_seq number.
-# 6. check the parameter field:
-# '''
+    
+    '''getting a cell convert its repertoire to desired string
+    repertoire --> list of tuples, unpack and condece with new line between them'''
+    def convert_cell_repertoire(self, cell):
+        str = ''
+        for pair in cell._repertoire_():
+            (ssr, protein)  = pair
+            str = str + ssr + '\n' + protein + '\n'
+        return str[:-1]
+
+
+
+'''this function gets input_path for an input file and validates its according to instrcutions:
+for each currect line append the corssepoding cell to a list.
+1. check there are only 4 headline. and that they are from type,dna,frame,param
+2. check all cells are from MC//NC type
+3. check that all the dna_seq are from A,T,C,G building blocks.
+4. check that all reading frame are between 1-3.
+5. check that there are matching amount of reading frames to dna_seq number.
+6. check the parameter field MC //NC 
+'''
 def validate_file(input_path):
     with open(input_path, 'r') as tsbfile:
         csv_reader = csv.DictReader(tsbfile,delimiter='\t')
@@ -303,7 +324,8 @@ def validate_file(input_path):
             create_cell(type_check[1],dna_check[1],frame_check[1],param_check[1],cells)
         return cells    
         
-           
+'''validate headline are tpye,dna,reading_frame,parameter no matter their location in the headline.
+return list with keys by this order.'''         
 def check_headlines(keys):
     look_for = ['type','dna','reading_frames','parameter']
     valid_heads = []
@@ -315,26 +337,10 @@ def check_headlines(keys):
     if len(valid_heads) == len(look_for):
         return (True,valid_heads)
     else : return (False,)
-'''this function gets a line from the file and creates the intended cell
-line is 4 types longs and alrdy has been validated,cell num 1 is nc, 2 is mc'''
-def create_cell(name,dna_seq,frames,param,cells): 
-    genome = (dna_seq,frames) 
-    cell = StemCell('name',genome)
-    if name == 'NC':
-        #nc
-        for each_cell in cell.mitosis():
-            cells.append(each_cell.differentiate('Nerve Cell',param))
-    else : #must be MC
-        cells.append(cell.differentiate('Muscle Cell',param))
     
- 
-# '''all check functions gets a line represented with a dictionary, and the keys view itself.
-# is searches for the headline casefolding if exists checks the context.
-# if not return false.'''
-
-# '''check there is type header.
-# if so check if its MC\NC if true returns tuple with the name
-# if not returns false.'''
+'''All check functions get the corrsepoding context via the key.
+key been validated by check_headlines.
+each function check by directions represented in the note of validate file'''
 
 def check_type(row, look_for):
     name = row.get(look_for) 
@@ -358,18 +364,21 @@ def check_DNA(row,look_for):
             return (False,)
         # all seqs have valid chars
         return (True,dna_seq,num_seq)
+    
 def check_readingframe(row,look_for):         
     reading_frame = row.get(look_for)
-    #split the dna by "comma"
-    reading_frame = reading_frame.split(",")
+    reading_frame = [float(x) for x in reading_frame.split(",")]
     num_frames = len(reading_frame)
     valid_frame = [1,2,3]
+    #check frames are integers and are valid - 1,2,3
     for x in reading_frame:
-        if int(x) not in valid_frame:
+        if not x.is_integer():
+            return (False,) 
+        elif x not in valid_frame:
             return (False,)
     return (True,reading_frame,num_frames)
-#checks parameter by cell type.
-# 1 = NC, 2 = MC
+'''checks parameter by cell type.
+1 = NC, 2 = MC'''
 def check_parameter(row,look_for,cell_type):
     param = row.get(look_for)
     param = param.split(",")
@@ -388,13 +397,41 @@ def check_parameter(row,look_for,cell_type):
             return (False,)  
         if float(param[1]) < 0:
             return (False,) 
-        else: return (True,param)
-            
+        with open(param[0],"w") as inputfile:
+            return (True,param)
+
+'''validates there are two arguments, file_path can be opened.
+all signals are int and positive'''
+def check_args(args):
+    assert len(args) == 3, "Wrong number of arguments"
+    #validate file can be opened
+    with open(args[1],"r") as file:
+        pass
+    signals = [float(i) for i in args[2].split(",")]
+    for signal in signals:
+        assert signal>0,"Negative signal!"
+        assert signal.is_integer(),"Non integer signal"
+    return signals
+
+'''this function gets a line from the file and creates the intended cell.
+line has laready been validated.'''
+def create_cell(name,dna_seq,frames,param,cells): 
+    genome = (dna_seq,frames) 
+    cell = StemCell('name',genome)
+    if name == 'NC':
+        #nc
+        for each_cell in cell.mitosis():
+            cells.append(each_cell.differentiate('Nerve Cell',param))
+    else : #must be MC
+        cells.append(cell.differentiate('Muscle Cell',param))
+
               
 if __name__ == '__main__':
-    cells = validate_file('input.txt')
+    signals = check_args(sys.argv)
+    cells = validate_file(sys.argv[1])
     network = NerveNetwork(cells)
     print(network)
-    print(network.get_muscle_cell()._repertoire_())
-    c = Cell('sad',('ATGATGATGCAT',1))
-    c._transcribe_(0)
+    for i in signals:
+        network.send_signal(i)
+    
+   
