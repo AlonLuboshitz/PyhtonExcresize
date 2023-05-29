@@ -1,6 +1,10 @@
 # Alon Luboshitz 312115090
 import sys
 import csv
+'''The cell class holds a name (type of cell) and genome.
+genome is list of tuples represnted by dna seq and reading frames accordingly.
+cell has a presentation of <Celltype,Number of seq in genome>
+it has find_ssr, transcribe, translate functions detailed in the class.'''
 class Cell:
     def __init__(self,name,genome) -> None:
         self.__name = name
@@ -191,7 +195,7 @@ class Cell:
         #dna_tuple = self.__genome[(dna_position%self.__numseq)]
         rna_seq = self._transcribe_(dna_position)
         reading_frame = self.__genome[1][dna_position%self.__numseq]
-        translation =  self.__translate__(rna_seq,int(reading_frame) - 1)
+        translation =  self.__translate__(rna_seq,int(reading_frame))
         if len(translation) == 0:
             return 'Non-coding RNA'
         else:
@@ -215,15 +219,19 @@ class Cell:
         return self.__genome
     def get_name(self):
         return self.__name
-    def set_name(self,name):
-        self.__name = name
-
+    
+'''this is a stem cell class
+it is the precursor class for diffrenet type of cells.
+it can multiple it self, mitosis (split to 2), and differntiate into a difrrenet type of cell.
+it has two nested cell classes atm: Muscle and Nerve each with its own functions.'''
 class StemCell(Cell):
+    def __init__(self):
+        pass
     def __init__(self, name, genome) -> None:
         super().__init__(name, genome)
     def __mul__(self, P):
         assert P > 0 ,"Cannot multiple Stem Cell by zero or negative number"
-        assert float(P) == int(P),"cannot multiple stemcell by non int number"
+        assert isinstance(P,int),"cannot multiple stemcell by non int number"
         stem_cells = []
         stem_cells.append(self)
         for i in range(P-1):
@@ -236,10 +244,12 @@ class StemCell(Cell):
             return self.NerveCell(self,args)
         elif (cell_name == 'Muscle Cell'):
             return self.MuscleCell(self,args)
-        else: return 'trying to init an unkown cell, please try again.'
+        else: assert False, 'trying to init an unkown cell, please try again.'
     class MuscleCell(Cell):
-        # init muscle cell from 
+        def __init__(self):
+            pass
         def __init__(self,Stem_cell, args) -> None:
+            assert isinstance(Stem_cell,StemCell),"Cannot create muscle not from Stem cell"
             super().__init__('Muscle Cell', Stem_cell.get_genome())
             self.__treshold = args[1]
             self.__file_path = args[0]
@@ -251,7 +261,10 @@ class StemCell(Cell):
                     file.write(line)
             else: pass
     class NerveCell(Cell):
+        def __init__(self):
+            pass
         def __init__(self, Stem_cell, P) -> None:
+            assert isinstance(Stem_cell,StemCell),"Cannot create nerve cell not from Stem cell"
             super().__init__('Nerve Cell', Stem_cell.get_genome())
             self.__coefficient = P
             self.__signal = 0
@@ -259,6 +272,10 @@ class StemCell(Cell):
             self.__signal = signal
         def send(self):
             return self.__signal * self.__coefficient
+'''this is a managing class of nerve cells. the network class gets a cell list and split
+them into nerve cells and muscle cell.
+it can send a signal through the nerve cells and print the cell representation.
+'''
 class NerveNetwork:
     def __init__(self, cell_list) -> None:
         self.__cell_list = cell_list
@@ -272,7 +289,9 @@ class NerveNetwork:
         self.__muscle_cell[0].receive(signal)
     def __str__(self) -> str:
         str = ''
-        for i in self.__cell_list:
+        for i in self.__nerve_cells:
+            str = str + (i.__str__() + '\n')
+        for i in self.__muscle_cell:
             str = str + (i.__str__() + '\n')
         str = str + self.convert_cell_repertoire(self.__muscle_cell[0])
         return str
@@ -367,16 +386,19 @@ def check_DNA(row,look_for):
     
 def check_readingframe(row,look_for):         
     reading_frame = row.get(look_for)
-    reading_frame = [float(x) for x in reading_frame.split(",")]
-    num_frames = len(reading_frame)
-    valid_frame = [1,2,3]
-    #check frames are integers and are valid - 1,2,3
-    for x in reading_frame:
-        if not x.is_integer():
-            return (False,) 
-        elif x not in valid_frame:
-            return (False,)
-    return (True,reading_frame,num_frames)
+    try:
+        reading_frame = [float(x) for x in reading_frame.split(",")]
+    except: return (False,)
+    else:
+        num_frames = len(reading_frame)
+        valid_frame = [0,1,2]
+        #check frames are integers and are valid - 1,2,3
+        for x in reading_frame:
+            if not x.is_integer():
+                return (False,) 
+            elif x not in valid_frame:
+                return (False,)
+        return (True,reading_frame,num_frames)
 '''checks parameter by cell type.
 1 = NC, 2 = MC'''
 def check_parameter(row,look_for,cell_type):
@@ -387,16 +409,26 @@ def check_parameter(row,look_for,cell_type):
     if cell_type == 1:
         if num_of_params != 1:
             return (False,)
-        param = float(param[0])
-        if param == int (param) or param < 0:
-            #not decimal number\ negative
+        try:
+            param = float(param[0])
+        except:
             return (False,)
-        else: return (True,param)
+        else: 
+            if  param < 0:
+                #param == int (param) or
+                #not decimal number\ negative
+                return (False,)
+            else: return (True,param)
     else: #cell type 2 MC
         if num_of_params != 2:
-            return (False,)  
-        if float(param[1]) < 0:
             return (False,) 
+        try:
+            treshold = float(param[1])
+        except:
+            return (False,)
+        else:
+            if treshold < 0:
+                return (False,) 
         with open(param[0],"w") as inputfile:
             return (True,param)
 
@@ -407,11 +439,16 @@ def check_args(args):
     #validate file can be opened
     with open(args[1],"r") as file:
         pass
-    signals = [float(i) for i in args[2].split(",")]
-    for signal in signals:
-        assert signal>0,"Negative signal!"
-        assert signal.is_integer(),"Non integer signal"
-    return signals
+    try:
+        signals = [float(i) for i in args[2].split(",")]
+    except:
+        assert False,"signal argument isnt a number"
+    else:
+            
+        for signal in signals:
+            assert signal>0,"Negative signal!"
+            assert signal.is_integer(),"Non integer signal"
+        return signals
 
 '''this function gets a line from the file and creates the intended cell.
 line has laready been validated.'''
@@ -425,7 +462,8 @@ def create_cell(name,dna_seq,frames,param,cells):
     else : #must be MC
         cells.append(cell.differentiate('Muscle Cell',param))
 
-              
+'''main function - gets two args, validate them create the nerve network
+with cells from the input file. prints the network and send signals to the network.'''          
 if __name__ == '__main__':
     signals = check_args(sys.argv)
     cells = validate_file(sys.argv[1])
@@ -433,5 +471,5 @@ if __name__ == '__main__':
     print(network)
     for i in signals:
         network.send_signal(i)
-    
+       
    
