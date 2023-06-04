@@ -471,5 +471,8 @@ if __name__ == '__main__':
     print(network)
     for i in signals:
         network.send_signal(i)
+    
+
+    
        
    
