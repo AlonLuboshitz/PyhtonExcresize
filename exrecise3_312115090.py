@@ -11,6 +11,8 @@ class myData:
         self.__books_data.loc[:,"Year-Of-Publication"] = pd.to_numeric(self.__books_data.loc[:,"Year-Of-Publication"],errors='coerce')
         self.__books_data = self.__books_data.dropna()
         self.__books_data.loc[:,"Year-Of-Publication"] = self.__books_data.loc[:,"Year-Of-Publication"].astype('int32')
+    def strip_colums(self):
+       self.__ratings_data.loc[:,"ISBN"] = self.__ratings_data.loc[:,"ISBN"].str.strip().astype('str')
     def num_year(self,x,y):
         assert x < y or x ==y,('first year argument  - {} is bigger or equals to second - {}'.format(x,y))
         #assert x < 0 or y < 0,'negative year, try again'
@@ -60,16 +62,28 @@ class myData:
     '''function get k number of books rating to be presented in ascending ordrer
     thourh thier rating value'''
     def top_k(self,k):
-        #group the books by title and for each group create a list of isbns.
-        grouped_books = self.__books_data.groupby("Book-Title")
-        
-
+        #check k bigger then df, k negatave etc..
+        #group the books by isbn and for each group calculate mean rating.
+        self.strip_colums()
+        grouped_isbns = self.__ratings_data.groupby("ISBN")['Book-Rating'].mean() 
+        rated_books = self.__books_data.join(grouped_isbns,on="ISBN")
+        rated_books = rated_books.dropna(subset=['Book-Rating'])
+        rated_books =  rated_books.sort_values(['Book-Rating','Book-Author'],ascending=[False,True])
+        return rated_books.loc[:,['Book-Title','Book-Author','Book-Rating']].head(int(k))
+        # pd.set_option('display.max_columns', None)
+        # pd.reset_option('display.max_columns')
+    '''this function group the users, sorts them by how many books they read'''
+    def most_active(self,user):
+        self.__ratings_data.loc[:,"User-ID"].astype('str').str.strip()
+        group_id= self.__ratings_data.groupby('User-ID').size()
+        group_id = group_id.sort_values(ascending=False)
+        print(group_id.iloc[int(user)-1])
 
 
 
 
 if __name__ == '__main__':
     md = myData('books.csv','ratings.csv','users.csv')
-    md.mean_rating('To Kill a Mockingbird')
+    md.most_active('3')
 
     
