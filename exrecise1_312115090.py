@@ -32,7 +32,7 @@ def find_ssr(dna_seq):
     ssr_dict = {}
     dna_seq = dna_seq.upper()
     # size of substr 1 - 6
-    for j in range(1,6):
+    for j in range(1,7):
         # iterating over dna_seq through offset
         for i in range(0, len(dna_seq), 1):
             #validating index
@@ -176,15 +176,18 @@ def convert(aa,letter):
     dict = {key: letter for key in aa}
     return dict
 if __name__ == '__main__':
-    if not len(sys.argv) == 5:
-        print('ERROR! wrong number of arguments')
-        exit(0)
-    else:
-        ssr_dict = find_ssr(sys.argv[1])
-        print(convert_dic_repsentation(ssr_dict))
-        print('RNA sequence: ' + transcribe(sys.argv[2]))
-        mrna= translate(sys.argv[3],int(sys.argv[4]))
-        if len(mrna) == 0:
-            print('Non-coding RNA')
-        else:
-            print('Translation: ' + mrna) 
+    # if not len(sys.argv) == 5:
+    #     print('ERROR! wrong number of arguments')
+    #     exit(0)
+    # else:
+    #     ssr_dict = find_ssr(sys.argv[1])
+    #     print(convert_dic_repsentation(ssr_dict))
+    #     print('RNA sequence: ' + transcribe(sys.argv[2]))
+    #     mrna= translate(sys.argv[3],int(sys.argv[4]))
+    #     if len(mrna) == 0:
+    #         print('Non-coding RNA')
+    #     else:
+    #         print('Translation: ' + mrna) 
+    
+    ssr_dict = find_ssr("ATGCCGAATGCCGAATGCCGAATGCCGATGCCGATGCCG")
+    print(convert_dic_repsentation(ssr_dict))

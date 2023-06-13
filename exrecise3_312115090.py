@@ -1,63 +1,153 @@
 # Alon Luboshitz 312115090
 import sys
 import pandas as pd
+'''class data gets three paths for csv files - books,user,rating
+validating three paths for that files holding memebers as data frames for those files.
+validating spesific colums in those files for functions later to be done and keeping
+those colums in a dict for each file.'''
 class myData:
     def __init__(self,books_path,ratings_path,users_path) -> None:
-        self.__books_data = pd.read_csv(books_path,sep=";",encoding='latin-1',on_bad_lines='skip')
-        self.__ratings_data = pd.read_csv(ratings_path,sep=";",encoding='latin-1',on_bad_lines='skip')
-        self.__users_data = pd.read_csv(users_path,sep=";",encoding='latin-1',on_bad_lines='skip')
-        self.remove_bad_lines()    
+        self.__dict_path = {}
+        answer = self.valid_path([books_path,ratings_path,users_path]) 
+        assert answer[0],"missing files: {}".format(answer[1])
+        self.__books_data = pd.read_csv(self.__dict_path['book'],sep=";",encoding='latin-1',on_bad_lines='skip')
+        self.__ratings_data = pd.read_csv(self.__dict_path['rating'],sep=";",encoding='latin-1',on_bad_lines='skip')
+        self.__users_data = pd.read_csv(self.__dict_path['user'],sep=";",encoding='latin-1',on_bad_lines='skip')
+        self.book_matching_dict = {}
+        self.rating_matching_dict = {}
+        self.user_matching_dict = {}
+        valid_colums = self.validate_files()
+        for bool in valid_colums:
+            assert bool[0],'coudlnt find corresponding titles in the {} dataframe'.format(bool[1])
+        self.remove_bad_lines() 
+    '''this function check that the paths given to the ctor are for correspoding
+    files. meaning there are three paths for books,user,rating.
+    if not returning false and the missing files as a string'''
+    def valid_path(self,path_list):
+        files_text = ['book','user','rating']
+        for text in files_text:
+            for path in path_list:
+                if text in path.lower():
+                    self.__dict_path[text] = path
+                    break
+                else: self.__dict_path[text] = False
+        missing_files = ''
+        return_val = True
+        for key, val in self.__dict_path.items():
+            if not val:
+                missing_files = missing_files + key + ','
+                return_val = False
+        return (return_val,missing_files)
+
+    '''this function checks the file consits the disered data by checking the index line
+    for books validate there is isbn,title,year,author.
+    for rankings - isbn,id,rating
+    for users - id, location,age
+    returns a tuple of 3 with boolean expressions for books,ranking,users'''
+    def validate_files(self):
+        #check book
+        books_colums_tocheck = ['isbn','title','year','author']
+        books_colums = self.__books_data.columns.tolist()
+        self.book_matching_dict = {text: [] for text in books_colums_tocheck}
+        for text in books_colums_tocheck:
+            for title in books_colums:
+                if text in title.lower():
+                    self.book_matching_dict[text] = title
+                    break
+        book_empty_list = (all(bool(lst) for lst in self.book_matching_dict.values()),'Books')
+        #check rating
+        rating_colums_tocheck = ['isbn','id','rating']
+        rating_colums = self.__ratings_data.columns.tolist()
+        self.rating_matching_dict = {text: [] for text in rating_colums_tocheck}
+        for text in rating_colums_tocheck:
+            for title in rating_colums:
+                if text in title.lower():
+                    self.rating_matching_dict[text] = title
+                    break
+        rating_empty_list = (all(bool(lst) for lst in self.rating_matching_dict.values()),'Rating')
+        #check user
+        user_colums_tocheck = ['location','id','age']
+        user_colums = self.__users_data.columns.tolist()
+        self.user_matching_dict = {text: [] for text in user_colums_tocheck}
+        for text in user_colums_tocheck:
+            for title in user_colums:
+                if text in title.lower():
+                    self.user_matching_dict[text] = title
+                    break
+        user_empty_list = (all(bool(lst) for lst in self.user_matching_dict.values()),'Users')
+        return (book_empty_list,rating_empty_list,user_empty_list)
+    '''this function remove lines with non numeric values in the year colum for the book df.
+    it changes afterward the colum to an int type'''
     def remove_bad_lines(self):
-        self.__books_data.loc[:,"Year-Of-Publication"] = pd.to_numeric(self.__books_data.loc[:,"Year-Of-Publication"],errors='coerce')
-        self.__books_data = self.__books_data.dropna()
-        self.__books_data.loc[:,"Year-Of-Publication"] = self.__books_data.loc[:,"Year-Of-Publication"].astype('int32')
+        year = self.book_matching_dict['year']
+        self.__books_data[year] = pd.to_numeric(self.__books_data[year],errors='coerce')
+        self.__books_data = self.__books_data.dropna(subset=[year])
+        self.__books_data.loc[:,year] = self.__books_data.loc[:,year].astype('int32')
+      
     def strip_colums(self):
        self.__ratings_data.loc[:,"ISBN"] = self.__ratings_data.loc[:,"ISBN"].str.strip().astype('str')
     def num_year(self,x,y):
-        assert x < y or x ==y,('first year argument  - {} is bigger or equals to second - {}'.format(x,y))
-        #assert x < 0 or y < 0,'negative year, try again'
+        assert x < y,('first year argument  - {} is bigger then second - {}'.format(x,y))
+        assert x != y, 'first year argument  - {} equals  second - {}'.format(x,y)
+        assert x > 0 ,'bad year value - {} '.format(x)
+        assert  y > 0,'bad year value - {} '.format(y)
         #filter true values of year range
-        is_within_range = (self.__books_data["Year-Of-Publication"] >= x) & (self.__books_data["Year-Of-Publication"] < y)
+        year = self.book_matching_dict['year']
+        is_within_range = (self.__books_data[year] >= x) & (self.__books_data[year] < y)
         book_in_range = self.__books_data[is_within_range]
-        print(len(book_in_range['Year-Of-Publication']))
+        return(len(book_in_range[year]))
+    '''return spesific data frame with only books written in that year
+    coloms returned are - title and author'''
     def df_published(self,year):
-        #return spesific data frame with only books written in that year
         assert year > 0, ('negative or non year value - {}.'.format(year))
         assert isinstance(year,int),'non integer value - {}'.format(year)
         #filter only year values
-        in_year = (self.__books_data['Year-Of-Publication'] == year)
-        author_title = pd.DataFrame(self.__books_data[in_year], columns=['Book-Title', 'Book-Author'])
-        print(author_title)
+        _year = self.book_matching_dict['year']
+        in_year = (self.__books_data[_year] == year)
+        author_title = pd.DataFrame(self.__books_data[in_year],
+                                     columns=[self.book_matching_dict['title'],self.book_matching_dict['author'] ])
+        return(author_title)
+    '''return tuples list including number of books for each year
+     sorted in ascending order '''
+    #VALID X ND Y
     def num_books_by_year(self,x,y):
         #filter by years
-        in_range_year_df = self.__books_data[(self.__books_data["Year-Of-Publication"] >= x) & (self.__books_data["Year-Of-Publication"] < y)]
-        count = in_range_year_df["Year-Of-Publication"].value_counts().sort_index()
+        year = self.book_matching_dict['year']
+        in_range_year_df = self.__books_data[(self.__books_data[year] >= x) & (self.__books_data[year] <= y)]
+        count = in_range_year_df[year].value_counts().sort_index()
         tuples_list = list(count.items())
-        print (tuples_list)
+        return (tuples_list)
+    
     def mean_std(self,country):
-        self.__users_data['Country'] = self.__users_data.loc[:,'Location'].str.split(',').str[-1].str.strip().astype('str')
-        country_data = self.__users_data.groupby('Country').agg({'Age':['mean','std']})
+        location = self.user_matching_dict['location']
+        age = self.user_matching_dict['age']
+        #ADD TRY AND EXCEPT FOR COUNTRY
+        self.__users_data['Country'] = self.__users_data.loc[:,location].str.split(',').str[-1].str.strip().astype('str')
+        country_data = self.__users_data.groupby('Country').agg({age:['mean','std']})
         print(country_data)
         print(country_data.index)
         country_data = country_data.round(3)
         try:
-            print(country_data.loc[country,'Age'])
-            mean_std_tuple = tuple(country_data.loc[country,'Age'])
+            print(country_data.loc[country,age])
+            mean_std_tuple = tuple(country_data.loc[country,age])
             return mean_std_tuple
         except KeyError:
             print("No such country: {}, exsits in data".format(country))
     def mean_rating(self,book_name):
+        title = self.book_matching_dict['title']
+        isbn = self.book_matching_dict['isbn']
         try:
             #group by title and get the group of the desired book
-            books_title = self.__books_data.groupby('Book-Title').get_group(book_name)
+            books_title = self.__books_data.groupby(title).get_group(book_name)
         except KeyError:
             return("No book: {} have been found".format(book_name))
         #list the isbns of that book
-        book_isbn = books_title["ISBN"].tolist()
+        book_isbn = books_title[isbn].tolist()
         # filter the ratings data via that list
-        filter_rating = self.__ratings_data[self.__ratings_data.loc[:,'ISBN'].isin(book_isbn)]
+        filter_rating = self.__ratings_data[self.__ratings_data.loc[:,isbn].isin(book_isbn)]
         #calculate the mean ratings after rating data been filtered.
-        mean_reating = filter_rating.loc[:,'Book-Rating'].mean()
+        rating = self.rating_matching_dict['rating']
+        mean_reating = filter_rating.loc[:,rating].mean()
         print (mean_reating)
     '''function get k number of books rating to be presented in ascending ordrer
     thourh thier rating value'''
@@ -65,17 +155,22 @@ class myData:
         #check k bigger then df, k negatave etc..
         #group the books by isbn and for each group calculate mean rating.
         self.strip_colums()
-        grouped_isbns = self.__ratings_data.groupby("ISBN")['Book-Rating'].mean() 
-        rated_books = self.__books_data.join(grouped_isbns,on="ISBN")
-        rated_books = rated_books.dropna(subset=['Book-Rating'])
-        rated_books =  rated_books.sort_values(['Book-Rating','Book-Author'],ascending=[False,True])
-        return rated_books.loc[:,['Book-Title','Book-Author','Book-Rating']].head(int(k))
+        rating = self.rating_matching_dict['rating']
+        author = self.book_matching_dict['author']
+        title = self.book_matching_dict['title']
+        rating_isbn = self.rating_matching_dict['isbn']
+        grouped_isbns = self.__ratings_data.groupby(rating_isbn)[rating].mean() 
+        rated_books = self.__books_data.join(grouped_isbns,on=rating_isbn)
+        rated_books = rated_books.dropna(subset=[rating])
+        rated_books =  rated_books.sort_values([rating,author,title],ascending=[False,True,True])
+        return rated_books.loc[:,[title,author,rating]].head(int(k))
         # pd.set_option('display.max_columns', None)
         # pd.reset_option('display.max_columns')
     '''this function group the users, sorts them by how many books they read'''
     def most_active(self,user):
-        self.__ratings_data.loc[:,"User-ID"].astype('str').str.strip()
-        group_id= self.__ratings_data.groupby('User-ID').size()
+        id = self.rating_matching_dict['id']
+        self.__ratings_data.loc[:,id].astype('str').str.strip()
+        group_id= self.__ratings_data.groupby(id).size()
         group_id = group_id.sort_values(ascending=False)
         print(group_id.iloc[int(user)-1])
 
@@ -84,6 +179,6 @@ class myData:
 
 if __name__ == '__main__':
     md = myData('books.csv','ratings.csv','users.csv')
-    md.most_active('3')
+    print (md.num_year(2000,2012))
 
     
