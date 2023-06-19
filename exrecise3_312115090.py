@@ -83,14 +83,21 @@ class myData:
         self.__books_data[year] = pd.to_numeric(self.__books_data[year],errors='coerce')
         self.__books_data = self.__books_data.dropna(subset=[year])
         self.__books_data.loc[:,year] = self.__books_data.loc[:,year].astype('int32')
-      
+    '''checks years are bigger then 0 and not decimal'''
+    def check_years(self,year_list):
+        for year in year_list:
+            if not isinstance(year,int):
+                return (False,'non integer value - {}'.format(year))
+            if year <= 0:
+                return (False,'bad year value - {} '.format(year))
+        return (True,)
     def strip_colums(self):
        self.__ratings_data.loc[:,"ISBN"] = self.__ratings_data.loc[:,"ISBN"].str.strip().astype('str')
     def num_year(self,x,y):
-        assert x < y,('first year argument  - {} is bigger then second - {}'.format(x,y))
         assert x != y, 'first year argument  - {} equals  second - {}'.format(x,y)
-        assert x > 0 ,'bad year value - {} '.format(x)
-        assert  y > 0,'bad year value - {} '.format(y)
+        assert x < y,('first year argument  - {} is bigger then second - {}'.format(x,y))
+        answer = self.check_years([x,y]) 
+        assert answer[0],answer[1]
         #filter true values of year range
         year = self.book_matching_dict['year']
         is_within_range = (self.__books_data[year] >= x) & (self.__books_data[year] < y)
@@ -99,8 +106,8 @@ class myData:
     '''return spesific data frame with only books written in that year
     coloms returned are - title and author'''
     def df_published(self,year):
-        assert year > 0, ('negative or non year value - {}.'.format(year))
-        assert isinstance(year,int),'non integer value - {}'.format(year)
+        answer = self.check_years([year]) 
+        assert answer[0],answer[1]
         #filter only year values
         _year = self.book_matching_dict['year']
         in_year = (self.__books_data[_year] == year)
@@ -111,28 +118,42 @@ class myData:
      sorted in ascending order '''
     #VALID X ND Y
     def num_books_by_year(self,x,y):
+        answer = self.check_years([x,y]) 
+        assert answer[0],answer[1]
+        assert x <= y,('first year argument  - {} is bigger then second - {}'.format(x,y))
         #filter by years
         year = self.book_matching_dict['year']
         in_range_year_df = self.__books_data[(self.__books_data[year] >= x) & (self.__books_data[year] <= y)]
-        count = in_range_year_df[year].value_counts().sort_index()
+        count = in_range_year_df[year].astype('int32').value_counts().sort_index()
         tuples_list = list(count.items())
         return (tuples_list)
-    
+    '''given a country name function returns the mean age and std.
+    cleaning null inputs in age colum.
+    creating country colum by grouped countries with aggregation for std,mean build in pands funcitons
+    try to locate the country, if there is no key returns string error'''
     def mean_std(self,country):
         location = self.user_matching_dict['location']
         age = self.user_matching_dict['age']
         #ADD TRY AND EXCEPT FOR COUNTRY
-        self.__users_data['Country'] = self.__users_data.loc[:,location].str.split(',').str[-1].str.strip().astype('str')
+        # Replace NULL values with NaN and remove them
+        self.__users_data[age] = self.__users_data[age].replace('NULL', pd.NA)
+        self.__users_data = self.__users_data.dropna(subset=[age])
+        #create new country colum with countries 
+
+        #if cleaning the string further with those methods we get more countries!
+        # .str.replace('.','').str.replace('"','')
+        self.__users_data['Country'] = (self.__users_data.loc[:,location].str.split(',').str[-1].str.strip().astype('str'))
+        #new DF grouped by countries with std, mean rounded to 3 digits.
         country_data = self.__users_data.groupby('Country').agg({age:['mean','std']})
-        print(country_data)
-        print(country_data.index)
         country_data = country_data.round(3)
+        
         try:
-            print(country_data.loc[country,age])
             mean_std_tuple = tuple(country_data.loc[country,age])
             return mean_std_tuple
         except KeyError:
-            print("No such country: {}, exsits in data".format(country))
+            return("No such country: {}, exsits in data".format(country))
+    '''function gets a book name, retrive it isbn list and extract the mean rating
+    from the isbn list from the rating df.'''
     def mean_rating(self,book_name):
         title = self.book_matching_dict['title']
         isbn = self.book_matching_dict['isbn']
@@ -145,40 +166,48 @@ class myData:
         book_isbn = books_title[isbn].tolist()
         # filter the ratings data via that list
         filter_rating = self.__ratings_data[self.__ratings_data.loc[:,isbn].isin(book_isbn)]
-        #calculate the mean ratings after rating data been filtered.
         rating = self.rating_matching_dict['rating']
+        #calculate the mean ratings after rating data been filtered.
         mean_reating = filter_rating.loc[:,rating].mean()
-        print (mean_reating)
+        return (mean_reating)
     '''function get k number of books rating to be presented in ascending ordrer
     thourh thier rating value'''
     def top_k(self,k):
-        #check k bigger then df, k negatave etc..
-        #group the books by isbn and for each group calculate mean rating.
+        assert isinstance(k,int),"{} is non interger value".format(k)
+        assert int(k) > 0 ,"number of users - {} cannot be 0 or negative".format(k)
         self.strip_colums()
         rating = self.rating_matching_dict['rating']
         author = self.book_matching_dict['author']
         title = self.book_matching_dict['title']
         rating_isbn = self.rating_matching_dict['isbn']
+        #group the books by isbn and for each group calculate mean rating.
         grouped_isbns = self.__ratings_data.groupby(rating_isbn)[rating].mean() 
+        #add the mean rating to the books data by the isbn value
         rated_books = self.__books_data.join(grouped_isbns,on=rating_isbn)
+        #discard NA values in the rating colum
         rated_books = rated_books.dropna(subset=[rating])
+        #sort values first by rating - descending, author - asc, title - asc
         rated_books =  rated_books.sort_values([rating,author,title],ascending=[False,True,True])
+        #if k is bigger then df all df is being returned.
         return rated_books.loc[:,[title,author,rating]].head(int(k))
-        # pd.set_option('display.max_columns', None)
-        # pd.reset_option('display.max_columns')
     '''this function group the users, sorts them by how many books they read'''
     def most_active(self,user):
+        assert isinstance(user,int),"{} is non interger value".format(user)
+        assert int(user) > 0 ,"user number - {} cannot be 0 or negative".format(user)
         id = self.rating_matching_dict['id']
+        #clean id colum from tracing spaces
         self.__ratings_data.loc[:,id].astype('str').str.strip()
+        #groupby id and calculate number of rows for each id group
         group_id= self.__ratings_data.groupby(id).size()
+        #sort by ascending size value
         group_id = group_id.sort_values(ascending=False)
-        print(group_id.iloc[int(user)-1])
+        try:
+            answer = (group_id.iloc[int(user)-1])
+            return answer
+        except IndexError:
+            return "user number given- {}, is bigger then amount of users!".format(user)
+            
 
 
-
-
-if __name__ == '__main__':
-    md = myData('books.csv','ratings.csv','users.csv')
-    print (md.num_year(2000,2012))
 
     
